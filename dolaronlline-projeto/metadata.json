@@ -1,0 +1,9 @@
+{
+  "name": "DólarOnlline",
+  "description": "Portal financeiro com cotação de moedas em tempo real, conversor e gráficos no domínio dolaronlline.com.br.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
+
