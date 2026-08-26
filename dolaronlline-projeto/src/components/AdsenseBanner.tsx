@@ -10,7 +10,7 @@ interface AdsenseBannerProps {
 }
 
 export default function AdsenseBanner({
-  client = "ca-pub-0000000000000000", // Substituir pelo ID ca-pub real de cada editor
+  client = "ca-pub-7230683739706170",
   slot,
   format = "auto",
   responsive = "true",
