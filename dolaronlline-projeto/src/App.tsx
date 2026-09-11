@@ -9,6 +9,7 @@ import News from './components/News';
 import Footer from './components/Footer';
 import AdsenseBanner from './components/AdsenseBanner';
 import FinanceEducation from './components/FinanceEducation';
+import EducationalGuides from './components/EducationalGuides';
 import { fetchQuotes, fetchNews } from './services/api';
 import { CoinData, NewsItem } from './types';
 import { FETCH_INTERVAL } from './constants';
@@ -101,6 +102,9 @@ export default function App() {
                 <AdsenseBanner slot="5432109876" format="fluid" />
                 <News news={news} />
               </div>
+
+              {/* Artigos e Guias Educativos (Exigência Google AdSense) */}
+              <EducationalGuides />
 
               {/* Bloco de Anúncio de Rodapé Horizontal */}
               <AdsenseBanner slot="1122334455" format="auto" className="max-w-5xl mx-auto mt-12" />

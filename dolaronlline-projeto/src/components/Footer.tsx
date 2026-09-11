@@ -34,28 +34,28 @@ export default function Footer() {
             <h4 className="text-text font-bold mb-6 text-sm">Informações & Termos</h4>
             <ul className="space-y-4 text-sm text-text-muted">
               <li>
-                <button 
-                  onClick={() => openModal('about')}
-                  className="hover:text-text transition-colors cursor-pointer text-left"
+                <a 
+                  href="/sobre.html"
+                  className="hover:text-text transition-colors text-left block"
                 >
                   Sobre Nós & Disclaimer
-                </button>
+                </a>
               </li>
               <li>
-                <button 
-                  onClick={() => openModal('privacy')}
-                  className="hover:text-text transition-colors cursor-pointer text-left"
+                <a 
+                  href="/politica-de-privacidade.html"
+                  className="hover:text-text transition-colors text-left block"
                 >
                   Política de Privacidade
-                </button>
+                </a>
               </li>
               <li>
-                <button 
-                  onClick={() => openModal('terms')}
-                  className="hover:text-text transition-colors cursor-pointer text-left"
+                <a 
+                  href="/termos-de-uso.html"
+                  className="hover:text-text transition-colors text-left block"
                 >
                   Termos de Uso
-                </button>
+                </a>
               </li>
               <li><a href="/sitemap.xml" target="_blank" className="hover:text-text transition-colors">Sitemap</a></li>
             </ul>
