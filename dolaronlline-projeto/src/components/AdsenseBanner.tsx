@@ -20,9 +20,11 @@ export default function AdsenseBanner({
   const adRef = useRef<HTMLModElement | null>(null);
   const isPushed = useRef(false);
 
+  // Evita disparar requisições com IDs fictícios durante a fase de análise do Google AdSense
+  const isRealSlot = slot && slot.length >= 8 && !['1234567890', '9876543210', '5432109876', '1122334455'].includes(slot);
+
   useEffect(() => {
-    // Evita chamar push duplicado no mesmo componente
-    if (isPushed.current) return;
+    if (!isRealSlot || isPushed.current) return;
 
     try {
       if (typeof window !== 'undefined') {
@@ -31,15 +33,18 @@ export default function AdsenseBanner({
         isPushed.current = true;
       }
     } catch (err) {
-      console.warn("Google AdSense não pôde inicializar o anúncio:", err);
+      console.warn("Google AdSense:", err);
     }
-  }, [slot]);
+  }, [slot, isRealSlot]);
 
-  // Se não houver slot definido e o usuário estiver usando Auto Ads do Google,
-  // os anúncios automáticos cuidam do layout. Caso haja slot, renderizamos o bloco oficial.
+  // Se não for um bloco com ID real configurado, não renderiza caixas vazias
+  // Isso evita a reprovação por 'anúncios veiculados em telas sem conteúdo do editor'
+  if (!isRealSlot) {
+    return null;
+  }
+
   return (
     <div className={`my-6 text-center overflow-hidden transition-all ${className}`}>
-      {/* Rótulo de conformidade do Google */}
       <div className="text-[10px] text-text-muted/60 uppercase tracking-widest font-semibold mb-1">
         Publicidade
       </div>
@@ -50,7 +55,7 @@ export default function AdsenseBanner({
           className="adsbygoogle"
           style={{ ...style, minHeight: '90px', width: '100%' }}
           data-ad-client={client}
-          {...(slot ? { 'data-ad-slot': slot } : {})}
+          data-ad-slot={slot}
           data-ad-format={format}
           data-full-width-responsive={responsive}
         />

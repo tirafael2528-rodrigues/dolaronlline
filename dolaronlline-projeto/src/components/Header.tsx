@@ -72,6 +72,23 @@ export default function Header({ selectedCurrency, onSelectCurrency }: HeaderPro
     }, 100);
   };
 
+  const handleScrollToGuias = () => {
+    setIsMenuOpen(false);
+    setTimeout(() => {
+      const element = document.getElementById('guias-educativos');
+      if (element) {
+        const headerOffset = 80;
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + (window.scrollY || window.pageYOffset || 0) - headerOffset;
+        
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -115,6 +132,13 @@ export default function Header({ selectedCurrency, onSelectCurrency }: HeaderPro
             className="hover:text-text transition-colors cursor-pointer"
           >
             Conversor
+          </button>
+          <button 
+            type="button"
+            onClick={handleScrollToGuias} 
+            className="hover:text-text transition-colors cursor-pointer"
+          >
+            Guias & Artigos
           </button>
         </nav>
 
@@ -180,6 +204,12 @@ export default function Header({ selectedCurrency, onSelectCurrency }: HeaderPro
                 className="text-left py-2 hover:text-text transition-colors w-full cursor-pointer pl-2"
               >
                 Conversor
+              </button>
+              <button 
+                onClick={handleScrollToGuias} 
+                className="text-left py-2 hover:text-text transition-colors w-full cursor-pointer pl-2"
+              >
+                Guias & Artigos
               </button>
             </div>
           </motion.div>

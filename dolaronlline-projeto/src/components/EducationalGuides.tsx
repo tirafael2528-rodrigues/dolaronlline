@@ -1,4 +1,4 @@
-import { BookOpen, ArrowUpRight, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { BookOpen, ArrowUpRight, ShieldCheck } from 'lucide-react';
 
 const GUIDES = [
   {
@@ -14,6 +14,20 @@ const GUIDES = [
     time: '7 min de leitura',
     title: 'Manual Completo do IOF no Câmbio: Dinheiro Vivo, Cartões e Contas Globais',
     summary: 'Conheça as alíquotas oficiais do IOF, o cálculo do Valor Efetivo Total (VET) e o cronograma de redução gradual.'
+  },
+  {
+    url: '/como-funciona-o-mercado-cambial-no-brasil.html',
+    category: 'Regulação & Mercado',
+    time: '7 min de leitura',
+    title: 'Como Funciona o Mercado de Câmbio no Brasil: Guia Didático Completo',
+    summary: 'O papel fiscalizador do Banco Central (Bacen), as reservas cambiais e como o regime de câmbio flutuante opera no país.'
+  },
+  {
+    url: '/dolar-futuro-e-hedge-cambial.html',
+    category: 'Gestão de Riscos',
+    time: '6 min de leitura',
+    title: 'Dólar Futuro e Hedge Cambial: Como Empresas e Investidores se Protegem',
+    summary: 'Entenda os contratos DOL e mini contratos WDO na B3 e como o mecanismo de hedge protege importadores e exportadores.'
   },
   {
     url: '/o-que-e-taxa-ptax.html',
@@ -33,7 +47,7 @@ const GUIDES = [
 
 export default function EducationalGuides() {
   return (
-    <section className="my-10 max-w-7xl mx-auto">
+    <section id="guias-educativos" className="my-12 max-w-7xl mx-auto scroll-mt-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2 text-primary text-xs font-bold uppercase tracking-wider mb-1">
@@ -49,7 +63,7 @@ export default function EducationalGuides() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {GUIDES.map((guide, idx) => (
           <a
             key={idx}
@@ -85,7 +99,7 @@ export default function EducationalGuides() {
         ))}
       </div>
 
-      <div className="mt-5 p-4 rounded-xl bg-card/60 border border-border/80 flex items-center gap-3 text-xs text-text-muted">
+      <div className="mt-6 p-4 rounded-xl bg-card/60 border border-border/80 flex items-center gap-3 text-xs text-text-muted">
         <ShieldCheck className="w-5 h-5 text-primary shrink-0" />
         <p>
           <strong className="text-text font-semibold">Compromisso Editorial:</strong> Todos os nossos guias são revisados com base nas normativas do Banco Central do Brasil (Bacen) e na legislação tributária vigente.
