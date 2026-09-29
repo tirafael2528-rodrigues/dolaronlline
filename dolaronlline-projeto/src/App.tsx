@@ -7,7 +7,6 @@ import Chart from './components/Chart';
 import MoedasCards from './components/MoedasCards';
 import News from './components/News';
 import Footer from './components/Footer';
-import AdsenseBanner from './components/AdsenseBanner';
 import FinanceEducation from './components/FinanceEducation';
 import EducationalGuides from './components/EducationalGuides';
 import { fetchQuotes, fetchNews } from './services/api';
@@ -75,15 +74,11 @@ export default function App() {
                 quotes={quotes}
               />
 
-              {/* Anúncio Inteligente de Topo */}
-              <AdsenseBanner slot="1234567890" format="auto" className="max-w-4xl mx-auto" />
-
-              {/* Educação Financeira • Banco Central do Brasil */}
-              <FinanceEducation />
-
+              {/* Grid de Moedas em Tempo Real */}
               <MoedasCards quotes={quotes} />
               
-              <div className="grid grid-cols-1 xl:grid-cols-[1fr,384px] gap-8 mt-12">
+              {/* Painel Principal: Gráfico Histórico + Conversor | Notícias */}
+              <div className="grid grid-cols-1 xl:grid-cols-[1fr,384px] gap-8 mt-4">
                 <div>
                   <Chart pair={chartPair} />
                   <Converter quotes={quotes} />
@@ -91,23 +86,20 @@ export default function App() {
                 <div className="hidden xl:block">
                   <div className="sticky top-24">
                     <News news={news} />
-                    {/* Anúncio Lateral Sticky */}
-                    <AdsenseBanner slot="9876543210" format="rectangle" className="mt-6" />
                   </div>
                 </div>
               </div>
 
-              {/* Anúncio de Meio para telas móveis */}
-              <div className="xl:hidden">
-                <AdsenseBanner slot="5432109876" format="fluid" />
+              {/* Notícias no mobile */}
+              <div className="xl:hidden mt-6">
                 <News news={news} />
               </div>
 
-              {/* Artigos e Guias Educativos (Exigência Google AdSense) */}
-              <EducationalGuides />
-
-              {/* Bloco de Anúncio de Rodapé Horizontal */}
-              <AdsenseBanner slot="1122334455" format="auto" className="max-w-5xl mx-auto mt-12" />
+              {/* Seção Editorial e Educativa (Requisito Google AdSense) */}
+              <div className="mt-16 pt-8 border-t border-border">
+                <EducationalGuides />
+                <FinanceEducation />
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

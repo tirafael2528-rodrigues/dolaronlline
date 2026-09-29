@@ -94,23 +94,30 @@ export default function Chart({ pair }: ChartProps) {
 
   // Load Primary Data
   useEffect(() => {
+    let isMounted = true;
     const loadHistory = async () => {
       setLoading(true);
       try {
         const history = await fetchHistory(pair, selectedTimeframe.days);
-        setData(history.reverse());
+        if (isMounted) {
+          setData(Array.isArray(history) ? [...history].reverse() : []);
+        }
       } catch (err) {
         console.error("Error loading primary history", err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
     loadHistory();
     setHoveredPoint(null); // Clear tooltips when switching pairs or ranges
+    return () => {
+      isMounted = false;
+    };
   }, [pair, selectedTimeframe]);
 
   // Load Comparison Data
   useEffect(() => {
+    let isMounted = true;
     const loadCompareHistory = async () => {
       if (!comparePair) {
         setCompareData([]);
@@ -119,15 +126,20 @@ export default function Chart({ pair }: ChartProps) {
       setLoadingCompare(true);
       try {
         const history = await fetchHistory(comparePair, selectedTimeframe.days);
-        setCompareData(history.reverse());
+        if (isMounted) {
+          setCompareData(Array.isArray(history) ? [...history].reverse() : []);
+        }
       } catch (err) {
         console.error("Error loading comparison history", err);
       } finally {
-        setLoadingCompare(false);
+        if (isMounted) setLoadingCompare(false);
       }
     };
     loadCompareHistory();
     setHoveredPoint(null); // Clear tooltips when switching comparison
+    return () => {
+      isMounted = false;
+    };
   }, [comparePair, selectedTimeframe]);
 
   // Unified aligned date timeline construction
