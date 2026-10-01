@@ -6,6 +6,8 @@ import Converter from './components/Converter';
 import Chart from './components/Chart';
 import MoedasCards from './components/MoedasCards';
 import News from './components/News';
+import PriceAlert from './components/PriceAlert';
+import MarketSentiment from './components/MarketSentiment';
 import Footer from './components/Footer';
 import FinanceEducation from './components/FinanceEducation';
 import EducationalGuides from './components/EducationalGuides';
@@ -82,16 +84,19 @@ export default function App() {
                 <div>
                   <Chart pair={chartPair} />
                   <Converter quotes={quotes} />
+                  <PriceAlert quotes={quotes} />
                 </div>
                 <div className="hidden xl:block">
-                  <div className="sticky top-24">
+                  <div className="sticky top-24 space-y-6">
+                    <MarketSentiment quote={quotes['USDBRL']} />
                     <News news={news} />
                   </div>
                 </div>
               </div>
 
-              {/* Notícias no mobile */}
-              <div className="xl:hidden mt-6">
+              {/* Sentimento e Notícias no mobile */}
+              <div className="xl:hidden mt-6 space-y-6">
+                <MarketSentiment quote={quotes['USDBRL']} />
                 <News news={news} />
               </div>
 

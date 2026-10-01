@@ -345,16 +345,37 @@ export const fetchNews = async (): Promise<NewsItem[]> => {
     {
       title: "Ibovespa acompanha bolsas internacionais e balança comercial",
       link: "https://valor.globo.com/",
-      pubDate: new Date().toISOString(),
+      pubDate: new Date(Date.now() - 3600000).toISOString(),
       description: "Commodities e fluxo de capital externo impulsionam os negócios no pregão desta sessão...",
       source: "Valor Econômico"
     },
     {
       title: "Banco Central reafirma meta de inflação e estabilidade cambial",
       link: "https://investing.com/",
-      pubDate: new Date().toISOString(),
+      pubDate: new Date(Date.now() - 7200000).toISOString(),
       description: "Relatório de mercado aponta expectativas para o dólar e projeções de câmbio para os próximos meses...",
       source: "Investing.com"
+    },
+    {
+      title: "Copom avalia trajetória da Taxa Selic em cenário de pressões externas",
+      link: "https://www.infomoney.com.br/",
+      pubDate: new Date(Date.now() - 10800000).toISOString(),
+      description: "Analistas projetam os próximos passos da política monetária diante do diferencial de juros com os Estados Unidos...",
+      source: "InfoMoney"
+    },
+    {
+      title: "Bitcoin renova máximas com fluxo institucional de ETFs e busca por reserva",
+      link: "https://cointelegraph.com.br/",
+      pubDate: new Date(Date.now() - 14400000).toISOString(),
+      description: "Criptoativo atrai demanda de investidores globais em meio a temores inflacionários e liquidez elevada...",
+      source: "CoinTelegraph"
+    },
+    {
+      title: "Exportadores ampliam operações de hedge cambial contra volatilidade da moeda",
+      link: "https://valor.globo.com/",
+      pubDate: new Date(Date.now() - 18000000).toISOString(),
+      description: "Empresas do agronegócio e manufaturados travam contratos futuros na B3 para blindar receitas em dólar...",
+      source: "Valor Econômico"
     }
   ];
 };

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { DollarSign, Github, Mail, HelpCircle, FileText } from 'lucide-react';
 import LegalModals from './LegalModals';
+import GitHubModal from './GitHubModal';
 
 export default function Footer() {
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'privacy' | 'terms' | 'about'>('about');
+  const [githubModalOpen, setGithubModalOpen] = useState(false);
 
   return (
     <footer className="mt-24 border-t border-border pt-16 pb-12 bg-card/20">
@@ -97,15 +99,15 @@ export default function Footer() {
                 <Mail size={16} />
                 <span>tirafael2528@gmail.com</span>
               </a>
-              <a 
-                href="https://github.com/tirafael2528" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="flex items-center gap-2.5 text-xs text-text-muted hover:text-text transition-colors mt-1"
+              <button 
+                type="button"
+                onClick={() => setGithubModalOpen(true)}
+                className="flex items-center gap-2.5 text-xs text-text-muted hover:text-primary transition-colors mt-1 cursor-pointer text-left"
+                title="Acessar conta e sincronização com GitHub"
               >
-                <Github size={16} />
-                <span>Perfil no GitHub</span>
-              </a>
+                <Github size={16} className="text-primary" />
+                <span className="font-semibold text-text hover:underline">Perfil no GitHub & Sincronização</span>
+              </button>
             </div>
           </div>
         </div>
@@ -121,6 +123,11 @@ export default function Footer() {
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         tab={activeTab}
+      />
+
+      <GitHubModal
+        isOpen={githubModalOpen}
+        onClose={() => setGithubModalOpen(false)}
       />
     </footer>
   );

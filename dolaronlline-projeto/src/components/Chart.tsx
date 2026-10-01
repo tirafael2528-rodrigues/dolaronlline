@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { Percent, DollarSign, TrendingUp, TrendingDown, ArrowRightLeft } from 'lucide-react';
 import { fetchHistory } from '../services/api';
 
 interface ChartProps {
@@ -35,6 +36,8 @@ interface AlignedDataPoint {
   originalCompare?: any;
   primaryBid: number;
   compareBid?: number;
+  primaryPct: number;
+  comparePct?: number;
 }
 
 const getCurrencyName = (p: string) => {
@@ -65,6 +68,7 @@ export default function Chart({ pair }: ChartProps) {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState<TimeframeOption>(TIMEFRAMES[1]); // Default 30D
+  const [viewMode, setViewMode] = useState<'price' | 'percent'>('price');
 
   // Comparison State
   const [comparePair, setComparePair] = useState<string>('');
@@ -77,6 +81,8 @@ export default function Chart({ pair }: ChartProps) {
     compareY?: number;
     primaryVal: number;
     compareVal?: number;
+    primaryPct: number;
+    comparePct?: number;
     dateLabel: string;
     fullDate: string;
     primaryLabel: string;
@@ -109,7 +115,7 @@ export default function Chart({ pair }: ChartProps) {
       }
     };
     loadHistory();
-    setHoveredPoint(null); // Clear tooltips when switching pairs or ranges
+    setHoveredPoint(null);
     return () => {
       isMounted = false;
     };
@@ -136,7 +142,7 @@ export default function Chart({ pair }: ChartProps) {
       }
     };
     loadCompareHistory();
-    setHoveredPoint(null); // Clear tooltips when switching comparison
+    setHoveredPoint(null);
     return () => {
       isMounted = false;
     };
@@ -171,7 +177,6 @@ export default function Chart({ pair }: ChartProps) {
     // Sort keys chronologically
     const sortedKeys = Array.from(dateMap.keys()).sort();
     
-    // Carry over state calculations to interpolate weekends/fiat trading schedule differences
     let lastPrimaryBid = 0;
     for (const d of data) {
       if (d.bid) {
@@ -190,6 +195,16 @@ export default function Chart({ pair }: ChartProps) {
       }
     }
     
+    // First pass to collect raw bids
+    const rawPoints: {
+      key: string;
+      label: string;
+      primaryBid: number;
+      compareBid?: number;
+      originalPrimary?: any;
+      originalCompare?: any;
+    }[] = [];
+
     sortedKeys.forEach(key => {
       const entry = dateMap.get(key)!;
       let primaryBid = lastPrimaryBid;
@@ -213,34 +228,41 @@ export default function Chart({ pair }: ChartProps) {
         label = `${parts[2]}/${parts[1]}`;
       }
       
-      alignedData.push({
-        dateKey: key,
-        dateLabel: label,
-        originalPrimary: entry.primary,
-        originalCompare: entry.compare,
+      rawPoints.push({
+        key,
+        label,
         primaryBid,
         compareBid,
+        originalPrimary: entry.primary,
+        originalCompare: entry.compare,
+      });
+    });
+
+    // Base values at day 0 (start of period) for percentage calculation
+    const basePrimaryBid = rawPoints.length > 0 && rawPoints[0].primaryBid > 0 ? rawPoints[0].primaryBid : 1;
+    const baseCompareBid = comparePair && rawPoints.length > 0 && rawPoints[0].compareBid !== undefined && rawPoints[0].compareBid > 0 
+      ? rawPoints[0].compareBid 
+      : 1;
+
+    // Second pass to calculate normalized percentages
+    rawPoints.forEach(pt => {
+      const primaryPct = ((pt.primaryBid - basePrimaryBid) / basePrimaryBid) * 100;
+      const comparePct = pt.compareBid !== undefined ? ((pt.compareBid - baseCompareBid) / baseCompareBid) * 100 : undefined;
+
+      alignedData.push({
+        dateKey: pt.key,
+        dateLabel: pt.label,
+        originalPrimary: pt.originalPrimary,
+        originalCompare: pt.originalCompare,
+        primaryBid: pt.primaryBid,
+        compareBid: pt.compareBid,
+        primaryPct,
+        comparePct,
       });
     });
   }
 
-  // Range and math calculations
-  const primaryPoints = alignedData.map(d => d.primaryBid);
-  const min = primaryPoints.length > 0 ? Math.min(...primaryPoints) : 0;
-  const max = primaryPoints.length > 0 ? Math.max(...primaryPoints) : 0;
-  const range = max - min || 1;
-
-  const comparePoints = comparePair && compareData.length > 0 
-    ? alignedData.filter(d => d.compareBid !== undefined).map(d => d.compareBid as number)
-    : [];
-  const compareMin = comparePoints.length > 0 ? Math.min(...comparePoints) : 0;
-  const compareMax = comparePoints.length > 0 ? Math.max(...comparePoints) : 0;
-  const compareRange = compareMax - compareMin || 1;
-
-  // Trend determination: last imported item is latest date, first imported is earliest
-  const trendUp = alignedData.length > 1 ? alignedData[alignedData.length - 1].primaryBid >= alignedData[0].primaryBid : true;
-  const compareTrendUp = alignedData.length > 1 && alignedData[alignedData.length - 1].compareBid !== undefined ? alignedData[alignedData.length - 1].compareBid! >= alignedData[0].compareBid! : true;
-
+  // --- Dimension constants ---
   const width = 800;
   const height = 360;
   const paddingX = 100;
@@ -252,11 +274,52 @@ export default function Chart({ pair }: ChartProps) {
     return (index / (alignedData.length - 1)) * (width - paddingX * 2) + paddingX;
   };
 
-  const getY = (val: number) => height - paddingYBottom - ((val - min) / range) * (height - paddingYBottom - paddingYTop);
-  const getCompareY = (val: number) => height - paddingYBottom - ((val - compareMin) / compareRange) * (height - paddingYBottom - paddingYTop);
+  // --- Price Mode Calculations ---
+  const primaryPoints = alignedData.map(d => d.primaryBid);
+  const minPrice = primaryPoints.length > 0 ? Math.min(...primaryPoints) : 0;
+  const maxPrice = primaryPoints.length > 0 ? Math.max(...primaryPoints) : 0;
+  const priceRange = maxPrice - minPrice || 1;
 
+  const comparePoints = comparePair && compareData.length > 0 
+    ? alignedData.filter(d => d.compareBid !== undefined).map(d => d.compareBid as number)
+    : [];
+  const compareMinPrice = comparePoints.length > 0 ? Math.min(...comparePoints) : 0;
+  const compareMaxPrice = comparePoints.length > 0 ? Math.max(...comparePoints) : 0;
+  const comparePriceRange = compareMaxPrice - compareMinPrice || 1;
+
+  const getPriceY = (val: number) => height - paddingYBottom - ((val - minPrice) / priceRange) * (height - paddingYBottom - paddingYTop);
+  const getComparePriceY = (val: number) => height - paddingYBottom - ((val - compareMinPrice) / comparePriceRange) * (height - paddingYBottom - paddingYTop);
+
+  // --- Percent Mode Calculations (Unified Axis) ---
+  const allPctValues = alignedData.map(d => d.primaryPct);
+  if (comparePair && compareData.length > 0) {
+    alignedData.forEach(d => {
+      if (d.comparePct !== undefined) allPctValues.push(d.comparePct);
+    });
+  }
+  const rawMinPct = allPctValues.length > 0 ? Math.min(0, ...allPctValues) : 0;
+  const rawMaxPct = allPctValues.length > 0 ? Math.max(0, ...allPctValues) : 0;
+  const pctSpan = rawMaxPct - rawMinPct;
+  const padPct = Math.max(0.4, pctSpan * 0.12);
+  const minPct = rawMinPct - padPct;
+  const maxPct = rawMaxPct + padPct;
+  const pctRange = maxPct - minPct || 1;
+
+  const getPctY = (val: number) => height - paddingYBottom - ((val - minPct) / pctRange) * (height - paddingYBottom - paddingYTop);
+
+  // Selector functions depending on viewMode
+  const getY = (d: AlignedDataPoint) => {
+    return viewMode === 'percent' ? getPctY(d.primaryPct) : getPriceY(d.primaryBid);
+  };
+
+  const getCompareY = (d: AlignedDataPoint) => {
+    if (d.compareBid === undefined) return 0;
+    return viewMode === 'percent' ? getPctY(d.comparePct || 0) : getComparePriceY(d.compareBid);
+  };
+
+  // SVG Paths
   const pathData = alignedData.length > 0 
-    ? alignedData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.primaryBid)}`).join(' ')
+    ? alignedData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d)}`).join(' ')
     : '';
 
   const areaData = alignedData.length > 0
@@ -264,8 +327,19 @@ export default function Chart({ pair }: ChartProps) {
     : '';
 
   const comparePathData = comparePair && compareData.length > 0 && alignedData.length > 0
-    ? alignedData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getCompareY(d.compareBid!)}`).join(' ')
+    ? alignedData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getCompareY(d)}`).join(' ')
     : '';
+
+  // Trend determination (last vs first)
+  const lastPoint = alignedData.length > 0 ? alignedData[alignedData.length - 1] : null;
+  const firstPoint = alignedData.length > 0 ? alignedData[0] : null;
+  const trendUp = lastPoint && firstPoint ? lastPoint.primaryBid >= firstPoint.primaryBid : true;
+  const compareTrendUp = lastPoint && firstPoint && lastPoint.compareBid !== undefined && firstPoint.compareBid !== undefined
+    ? lastPoint.compareBid >= firstPoint.compareBid
+    : true;
+
+  const totalPrimaryChangePct = lastPoint ? lastPoint.primaryPct : 0;
+  const totalCompareChangePct = lastPoint && lastPoint.comparePct !== undefined ? lastPoint.comparePct : 0;
 
   const numDates = 5;
   const dateIndices = Array.from({ length: numDates }).map((_, i) => {
@@ -283,14 +357,10 @@ export default function Chart({ pair }: ChartProps) {
       
     if (!clientX) return;
 
-    // Relative mouse X position inside client width of the SVG
     const relativeX = clientX - rect.left;
     const percentX = relativeX / rect.width;
-    
-    // Convert to native SVG coordinates space (width = 800)
     const svgX = percentX * width;
     
-    // Calculate relative index inside the plotting width
     const chartWidth = width - paddingX * 2;
     const adjustedX = svgX - paddingX;
     
@@ -302,14 +372,14 @@ export default function Chart({ pair }: ChartProps) {
     if (d) {
       const primaryVal = d.primaryBid;
       const x = getX(index);
-      const primaryY = getY(primaryVal);
+      const primaryY = getY(d);
       
       let compareY: number | undefined = undefined;
       let compareVal: number | undefined = undefined;
       
       if (comparePair && d.compareBid !== undefined) {
         compareVal = d.compareBid;
-        compareY = getCompareY(compareVal);
+        compareY = getCompareY(d);
       }
       
       let fullDateStr = '';
@@ -347,6 +417,8 @@ export default function Chart({ pair }: ChartProps) {
         compareY,
         primaryVal,
         compareVal,
+        primaryPct: d.primaryPct,
+        comparePct: d.comparePct,
         dateLabel: d.dateLabel,
         fullDate: fullDateStr,
         primaryLabel: getCurrencyName(pair),
@@ -360,26 +432,72 @@ export default function Chart({ pair }: ChartProps) {
   };
 
   return (
-    <section className="py-12">
-      <div className="p-8 rounded-[2rem] bg-card border border-border relative overflow-hidden">
-        {/* Header and tools */}
+    <section className="py-8">
+      <div className="p-6 md:p-8 rounded-[2rem] bg-card border border-border relative overflow-hidden">
+        {/* Header e Ferramentas */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
           <div>
-            <h2 className="text-xl font-bold text-text flex items-center gap-2">
-              Histórico {selectedTimeframe.label}
-            </h2>
-            <p className="text-sm text-text-muted">
-              Variação da cotação no {selectedTimeframe.description}
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-text flex items-center gap-2">
+                Histórico {selectedTimeframe.label}
+              </h2>
+              {viewMode === 'percent' && (
+                <span className="text-[10px] font-black uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full">
+                  Modo Comparação %
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-text-muted mt-0.5">
+              {viewMode === 'percent' 
+                ? `Variação percentual acumulada no ${selectedTimeframe.description} (base 0% no 1º dia)`
+                : `Variação da cotação no ${selectedTimeframe.description}`}
             </p>
           </div>
           
-          <div className="flex flex-wrap items-center gap-4 animate-fade-in">
-            {/* Currency Comparison Selector */}
+          <div className="flex flex-wrap items-center gap-3 animate-fade-in">
+            {/* Seletor de Modo: Preço R$ ou Variação % */}
+            <div className="flex bg-text/5 p-1 rounded-xl border border-border">
+              <button
+                type="button"
+                onClick={() => setViewMode('price')}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  viewMode === 'price'
+                    ? 'bg-primary text-black shadow-lg shadow-primary/20 font-black'
+                    : 'text-text-muted hover:text-text'
+                }`}
+                title="Exibir cotações nominais em R$"
+              >
+                <DollarSign size={13} />
+                <span>Preço (R$)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('percent')}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  viewMode === 'percent'
+                    ? 'bg-primary text-black shadow-lg shadow-primary/20 font-black'
+                    : 'text-text-muted hover:text-text'
+                }`}
+                title="Exibir variação percentual acumulada (%) no mesmo eixo comparativo"
+              >
+                <Percent size={13} />
+                <span>Variação (%)</span>
+              </button>
+            </div>
+
+            {/* Seletor de Comparação */}
             <div className="flex items-center gap-2 bg-text/5 px-3 py-1.5 rounded-xl border border-border">
               <span className="text-[10px] font-black uppercase text-text-muted tracking-wider">Comparar:</span>
               <select
                 value={comparePair}
-                onChange={(e) => setComparePair(e.target.value)}
+                onChange={(e) => {
+                  setComparePair(e.target.value);
+                  // Auto-switch or suggest percent mode when comparing
+                  if (e.target.value && viewMode === 'price') {
+                    setViewMode('percent');
+                  }
+                }}
                 className="bg-transparent border-none text-xs font-bold text-text cursor-pointer focus:outline-none focus:ring-0 select-auto py-0 pr-6 pl-0"
               >
                 {COMPARE_OPTIONS.map((opt) => {
@@ -393,7 +511,7 @@ export default function Chart({ pair }: ChartProps) {
               </select>
             </div>
 
-            {/* Custom select/pill-group */}
+            {/* Intervalo de Tempo */}
             <div className="flex bg-text/5 p-1 rounded-xl border border-border">
               {TIMEFRAMES.map((tf) => (
                 <button
@@ -410,38 +528,34 @@ export default function Chart({ pair }: ChartProps) {
               ))}
             </div>
 
-            {/* Dynamic Trend Indicators */}
+            {/* Indicadores de Desempenho e Tendência */}
             <div className="flex flex-wrap items-center gap-2">
               {!loading && data.length > 0 && (
-                <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg border ${
+                <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg border flex items-center gap-1 ${
                   trendUp 
                     ? 'text-green-500 bg-green-500/10 border-green-500/10' 
                     : 'text-red-500 bg-red-500/10 border-red-500/10'
                 }`}>
-                  {getCurrencyName(pair).split(' ')[0]}: {trendUp ? '↑' : '↓'}
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  {getCurrencyName(pair).split(' ')[0]}: {trendUp ? '↑' : '↓'} {totalPrimaryChangePct >= 0 ? `+${totalPrimaryChangePct.toFixed(2)}%` : `${totalPrimaryChangePct.toFixed(2)}%`}
                 </span>
               )}
 
               {comparePair && !loadingCompare && compareData.length > 0 && (
-                <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg border ${
+                <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg border flex items-center gap-1 ${
                   compareTrendUp 
                     ? 'text-green-500 bg-green-500/10 border-green-500/10' 
                     : 'text-red-500 bg-red-500/10 border-red-500/10'
                 }`}>
-                  {getCurrencyName(comparePair).split(' ')[0]}: {compareTrendUp ? '↑' : '↓'}
-                </span>
-              )}
-
-              {comparePair && loadingCompare && (
-                <span className="text-[10px] font-black uppercase px-2 py-1 rounded-lg border bg-text/5 text-text-muted border-border animate-pulse">
-                  Carregando...
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
+                  {getCurrencyName(comparePair).split(' ')[0]}: {compareTrendUp ? '↑' : '↓'} {totalCompareChangePct >= 0 ? `+${totalCompareChangePct.toFixed(2)}%` : `${totalCompareChangePct.toFixed(2)}%`}
                 </span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Chart View with loading state overlay */}
+        {/* Visualização do Gráfico */}
         <div className="relative h-72 sm:h-80 md:h-[360px] w-full">
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-card/50 backdrop-blur-xs z-10">
@@ -476,15 +590,56 @@ export default function Chart({ pair }: ChartProps) {
                 </linearGradient>
               </defs>
               
-              {/* Dynamic Grid lines & Price labels (Left for main, Right for comparison) */}
+              {/* Linhas de Grade e Valores dos Eixos */}
               {Array.from({ length: 6 }).map((_, k) => {
-                const val = max - k * ((max - min) / 5);
                 const y = paddingYTop + k * (height - paddingYBottom - paddingYTop) / 5;
                 const isBoundary = k === 0 || k === 5;
                 const strokeOpacity = isBoundary ? "0.15" : "0.05";
                 
+                // Em modo percentual, ambos os lados usam a mesma escala percentual unificada!
+                if (viewMode === 'percent') {
+                  const pctVal = maxPct - k * ((maxPct - minPct) / 5);
+                  return (
+                    <g key={`grid-line-pct-${k}`}>
+                      <line 
+                        x1={paddingX} 
+                        y1={y} 
+                        x2={width - paddingX} 
+                        y2={y} 
+                        stroke="currentColor" 
+                        strokeOpacity={strokeOpacity} 
+                        strokeDasharray={isBoundary ? undefined : "4 4"}
+                      />
+                      <text 
+                        x={10} 
+                        y={y + 6} 
+                        fontSize={16}
+                        fontWeight="bold"
+                        className="fill-primary font-mono"
+                      >
+                        {pctVal >= 0 ? `+${pctVal.toFixed(1)}%` : `${pctVal.toFixed(1)}%`}
+                      </text>
+
+                      {comparePair && compareData.length > 0 && !loadingCompare && (
+                        <text 
+                          x={width - 10} 
+                          y={y + 6} 
+                          fontSize={16}
+                          fontWeight="bold"
+                          textAnchor="end"
+                          className="fill-[#06B6D4] font-mono"
+                        >
+                          {pctVal >= 0 ? `+${pctVal.toFixed(1)}%` : `${pctVal.toFixed(1)}%`}
+                        </text>
+                      )}
+                    </g>
+                  );
+                }
+
+                // Em modo Preço nominal (R$)
+                const val = maxPrice - k * ((maxPrice - minPrice) / 5);
                 return (
-                  <g key={`grid-line-${k}`}>
+                  <g key={`grid-line-price-${k}`}>
                     <line 
                       x1={paddingX} 
                       y1={y} 
@@ -494,46 +649,72 @@ export default function Chart({ pair }: ChartProps) {
                       strokeOpacity={strokeOpacity} 
                       strokeDasharray={isBoundary ? undefined : "4 4"}
                     />
-                    
-                    {/* Primary axis value labels on left */}
                     <text 
                       x={10} 
                       y={y + 6} 
-                      fontSize={18}
+                      fontSize={16}
                       fontWeight="bold"
                       className="fill-primary font-mono"
                     >
                       {val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </text>
 
-                    {/* Comparison axis value labels on right (Cyan) */}
                     {comparePair && compareData.length > 0 && !loadingCompare && (
                       <text 
                         x={width - 10} 
                         y={y + 6} 
-                        fontSize={18}
+                        fontSize={16}
                         fontWeight="bold"
                         textAnchor="end"
                         className="fill-[#06B6D4] font-mono"
                       >
-                        {(compareMax - k * ((compareMax - compareMin) / 5)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {(compareMaxPrice - k * ((compareMaxPrice - compareMinPrice) / 5)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </text>
                     )}
                   </g>
                 );
               })}
 
-              <motion.path
-                key={`area-${selectedTimeframe.days}-${pair}`}
-                d={areaData}
-                fill="url(#gradient)"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5 }}
-              />
+              {/* Linha Zero de Referência (Base 0%) no modo percentual */}
+              {viewMode === 'percent' && minPct <= 0 && maxPct >= 0 && (
+                <g>
+                  <line 
+                    x1={paddingX} 
+                    y1={getPctY(0)} 
+                    x2={width - paddingX} 
+                    y2={getPctY(0)} 
+                    stroke="currentColor" 
+                    strokeOpacity="0.4" 
+                    strokeDasharray="4 4"
+                    strokeWidth="1.5"
+                  />
+                  <text
+                    x={paddingX + 8}
+                    y={getPctY(0) - 6}
+                    fontSize={11}
+                    fontWeight="bold"
+                    className="fill-text-muted font-mono"
+                  >
+                    0.00% (Base Início)
+                  </text>
+                </g>
+              )}
+
+              {/* Área sombreada (ativa no modo Preço) */}
+              {viewMode === 'price' && (
+                <motion.path
+                  key={`area-${selectedTimeframe.days}-${pair}`}
+                  d={areaData}
+                  fill="url(#gradient)"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5 }}
+                />
+              )}
               
+              {/* Linha da Moeda Principal (Dourado) */}
               <motion.path
-                key={`path-${selectedTimeframe.days}-${pair}`}
+                key={`path-${viewMode}-${selectedTimeframe.days}-${pair}`}
                 d={pathData}
                 fill="none"
                 stroke="#D4AF37"
@@ -545,10 +726,10 @@ export default function Chart({ pair }: ChartProps) {
                 transition={{ duration: 0.8, ease: "easeInOut" }}
               />
 
-              {/* Secondary currency curve line (Cyan) */}
+              {/* Linha da Moeda de Comparação (Ciano) */}
               {comparePair && compareData.length > 0 && !loadingCompare && (
                 <motion.path
-                  key={`compare-path-${selectedTimeframe.days}-${comparePair}`}
+                  key={`compare-path-${viewMode}-${selectedTimeframe.days}-${comparePair}`}
                   d={comparePathData}
                   fill="none"
                   stroke="#06B6D4"
@@ -561,27 +742,26 @@ export default function Chart({ pair }: ChartProps) {
                 />
               )}
 
-              {/* Dynamic Axis Dates rendering */}
-              {!loading && alignedData.length > 0 && dateIndices.map((dataIndex, idx) => {
-                const d = alignedData[dataIndex];
-                if (!d) return null;
-                const x = getX(dataIndex);
+              {/* Rótulos de Data no Eixo X */}
+              {dateIndices.map((idx, k) => {
+                const item = alignedData[idx];
+                if (!item) return null;
+                const x = getX(idx);
                 return (
-                  <text
-                    key={`chart-date-${idx}`}
-                    x={x}
-                    y={height - 18}
+                  <text 
+                    key={`date-label-${k}`}
+                    x={x} 
+                    y={height - 15} 
+                    fontSize={14}
                     textAnchor="middle"
-                    fontSize={18}
-                    fontWeight="bold"
-                    className="fill-text-muted font-mono"
+                    className="fill-text-muted font-mono font-medium"
                   >
-                    {d.dateLabel}
+                    {item.dateLabel}
                   </text>
                 );
               })}
 
-              {/* Tooltip guidelines inside SVG */}
+              {/* Linhas e Marcadores ao passar o mouse */}
               {hoveredPoint && (
                 <g>
                   <line 
@@ -589,111 +769,96 @@ export default function Chart({ pair }: ChartProps) {
                     y1={paddingYTop} 
                     x2={hoveredPoint.x} 
                     y2={height - paddingYBottom} 
-                    stroke="#D4AF37" 
-                    strokeWidth="1.5" 
+                    stroke="currentColor" 
+                    strokeOpacity="0.4" 
                     strokeDasharray="4 4" 
-                    opacity="0.6"
-                  />
-                  
-                  {/* Primary marker */}
-                  <circle 
-                    cx={hoveredPoint.x} 
-                    cy={hoveredPoint.primaryY} 
-                    r="8" 
-                    fill="#D4AF37" 
-                    opacity="0.3"
                   />
                   <circle 
                     cx={hoveredPoint.x} 
                     cy={hoveredPoint.primaryY} 
-                    r="4" 
-                    fill="#D4AF37"
-                    stroke="white"
-                    strokeWidth="1.5"
+                    r={6} 
+                    className="fill-primary"
                   />
-
-                  {/* Comparison marker */}
                   {hoveredPoint.compareY !== undefined && (
-                    <>
-                      <circle 
-                        cx={hoveredPoint.x} 
-                        cy={hoveredPoint.compareY} 
-                        r="8" 
-                        fill="#06B6D4" 
-                        opacity="0.3"
-                      />
-                      <circle 
-                        cx={hoveredPoint.x} 
-                        cy={hoveredPoint.compareY} 
-                        r="4" 
-                        fill="#06B6D4"
-                        stroke="white"
-                        strokeWidth="1.5"
-                      />
-                    </>
+                    <circle 
+                      cx={hoveredPoint.x} 
+                      cy={hoveredPoint.compareY} 
+                      r={6} 
+                      className="fill-[#06B6D4]"
+                    />
                   )}
                 </g>
               )}
             </svg>
           )}
 
-          {/* Interactive HTML Tooltip Absolute overlay */}
-          <AnimatePresence>
-            {hoveredPoint && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="absolute pointer-events-none z-20 bg-background/95 backdrop-blur-md border border-primary/40 px-4 py-2.5 rounded-2xl shadow-xl min-w-[185px] max-w-[280px] text-left animate-fade-in"
-                style={{
-                  left: `${(hoveredPoint.x / width) * 100}%`,
-                  top: `${((hoveredPoint.compareY !== undefined ? Math.min(hoveredPoint.primaryY, hoveredPoint.compareY) : hoveredPoint.primaryY) / height) * 100}%`,
-                  transform: 'translate(-50%, calc(-100% - 15px))'
-                }}
-              >
-                <div className="text-[10px] uppercase font-black text-text-muted tracking-wider border-b border-border pb-1.5 mb-1.5 font-mono">
+          {/* Tooltip Interativo */}
+          {hoveredPoint && (
+            <div 
+              className="absolute z-20 pointer-events-none bg-card/95 backdrop-blur-md border border-border p-3 rounded-2xl shadow-2xl text-xs flex flex-col gap-1.5 min-w-[200px]"
+              style={{
+                left: `${(hoveredPoint.x / width) * 100}%`,
+                top: `${((hoveredPoint.compareY !== undefined ? Math.min(hoveredPoint.primaryY, hoveredPoint.compareY) : hoveredPoint.primaryY) / height) * 100}%`,
+                transform: 'translate(-50%, -125%)'
+              }}
+            >
+              <div className="flex items-center justify-between border-b border-border/60 pb-1">
+                <span className="text-[10px] text-text-muted font-mono font-bold">
                   {hoveredPoint.fullDate}
-                </div>
-                
-                {/* Primary currency output */}
-                <div className="flex items-center justify-between gap-4 text-xs font-semibold">
-                  <span className="text-text-muted flex items-center gap-1.5 shrink-0">
-                    <span className="w-2 h-2 rounded-full bg-primary" />
-                    {hoveredPoint.primaryLabel.split(' ')[0]}
-                  </span>
-                  <span className="font-mono text-primary font-black">
-                    {hoveredPoint.primaryVal.toLocaleString('pt-BR', { 
-                      style: 'currency', 
-                      currency: 'BRL', 
-                      minimumFractionDigits: 2, 
-                      maximumFractionDigits: 4 
-                    })}
-                  </span>
-                </div>
+                </span>
+                <span className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-text/5 text-text-muted">
+                  {viewMode === 'percent' ? 'Modo %' : 'Modo R$'}
+                </span>
+              </div>
 
-                {/* Compare currency output */}
-                {hoveredPoint.compareVal !== undefined && hoveredPoint.compareLabel && (
-                  <div className="flex items-center justify-between gap-4 text-xs font-semibold mt-1 border-t border-border/50 pt-1">
-                    <span className="text-text-muted flex items-center gap-1.5 shrink-0">
-                      <span className="w-2 h-2 rounded-full bg-[#06B6D4]" />
-                      {hoveredPoint.compareLabel.split(' ')[0]}
-                    </span>
-                    <span className="font-mono text-[#06B6D4] font-black">
-                      {hoveredPoint.compareVal.toLocaleString('pt-BR', { 
-                        style: 'currency', 
-                        currency: 'BRL', 
-                        minimumFractionDigits: 2, 
-                        maximumFractionDigits: 4 
-                      })}
-                    </span>
+              {/* Moeda Principal */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-primary" />
+                  <span className="text-primary font-bold">{hoveredPoint.primaryLabel.split(' ')[0]}:</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-mono">
+                  <span className="text-text font-bold">
+                    R$ {hoveredPoint.primaryVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                  </span>
+                  <span className={`text-[10px] font-bold ${hoveredPoint.primaryPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    ({hoveredPoint.primaryPct >= 0 ? `+${hoveredPoint.primaryPct.toFixed(2)}%` : `${hoveredPoint.primaryPct.toFixed(2)}%`})
+                  </span>
+                </div>
+              </div>
+
+              {/* Moeda de Comparação */}
+              {hoveredPoint.compareVal !== undefined && hoveredPoint.compareLabel && (
+                <div className="flex items-center justify-between gap-3 border-t border-border/40 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#06B6D4]" />
+                    <span className="text-[#06B6D4] font-bold">{hoveredPoint.compareLabel.split(' ')[0]}:</span>
                   </div>
-                )}
-                
-                {/* Visual tooltip pop arrow indicator */}
-                <div className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-background border-r border-b border-primary/40 rotate-45 pointer-events-none" />
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  <div className="flex items-center gap-1.5 font-mono">
+                    <span className="text-text font-bold">
+                      R$ {hoveredPoint.compareVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                    </span>
+                    {hoveredPoint.comparePct !== undefined && (
+                      <span className={`text-[10px] font-bold ${hoveredPoint.comparePct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        ({hoveredPoint.comparePct >= 0 ? `+${hoveredPoint.comparePct.toFixed(2)}%` : `${hoveredPoint.comparePct.toFixed(2)}%`})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Diferença / Spread Comparativo */}
+              {hoveredPoint.comparePct !== undefined && (
+                <div className="mt-1 pt-1 border-t border-border/50 text-[10px] text-text-muted flex items-center justify-between">
+                  <span>Diferença / Spread:</span>
+                  <span className="font-mono font-bold text-text">
+                    {(hoveredPoint.primaryPct - hoveredPoint.comparePct) >= 0 ? '+' : ''}
+                    {(hoveredPoint.primaryPct - hoveredPoint.comparePct).toFixed(2)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </section>
