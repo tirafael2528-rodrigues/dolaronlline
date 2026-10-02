@@ -1,7 +1,6 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { DollarSign, Menu, Moon, Sun, X, Github } from 'lucide-react';
+import { DollarSign, Menu, Moon, Sun, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import GitHubModal from './GitHubModal';
 
 interface HeaderProps {
   selectedCurrency: 'USD' | 'EUR' | 'BTC';
@@ -10,7 +9,6 @@ interface HeaderProps {
 
 export default function Header({ selectedCurrency, onSelectCurrency }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [githubModalOpen, setGithubModalOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark';
@@ -157,14 +155,6 @@ export default function Header({ selectedCurrency, onSelectCurrency }: HeaderPro
           )}
 
           <button 
-            onClick={() => setGithubModalOpen(true)}
-            className="p-2 text-text-muted hover:text-text transition-colors"
-            aria-label="Conta GitHub & Sincronização"
-            title="Conta GitHub & Sincronização"
-          >
-            <Github className="w-5 h-5" />
-          </button>
-          <button 
             onClick={toggleTheme}
             className="p-2 text-text-muted hover:text-text transition-colors"
             aria-label="Toggle theme"
@@ -221,25 +211,10 @@ export default function Header({ selectedCurrency, onSelectCurrency }: HeaderPro
               >
                 Guias & Artigos
               </button>
-              <button 
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  setGithubModalOpen(true);
-                }} 
-                className="text-left py-2 hover:text-primary transition-colors w-full cursor-pointer pl-2 flex items-center gap-2 text-primary font-semibold border-t border-border/50 pt-3"
-              >
-                <Github size={16} />
-                <span>Perfil no GitHub & Sincronização</span>
-              </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      <GitHubModal
-        isOpen={githubModalOpen}
-        onClose={() => setGithubModalOpen(false)}
-      />
     </header>
   );
 }
