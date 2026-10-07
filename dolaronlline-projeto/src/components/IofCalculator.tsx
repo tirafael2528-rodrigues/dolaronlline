@@ -5,28 +5,34 @@ import {
   Banknote, 
   Globe2, 
   Sparkles, 
-  HelpCircle, 
   TrendingDown, 
-  CheckCircle2, 
   Percent, 
   Sliders, 
   Info,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  FileDown,
+  Check
 } from 'lucide-react';
+import { calculateIof } from '../utils/iof';
+import { exportConverterPdf } from '../utils/exportPdf';
 
 interface IofCalculatorProps {
   amount: number;
   fromCurrency: string;
   toCurrency: string;
   baseRateToBRL: number;
+  convertedResult?: number;
+  unitRate?: number;
 }
 
 export default function IofCalculator({
   amount,
   fromCurrency,
   toCurrency,
-  baseRateToBRL
+  baseRateToBRL,
+  convertedResult,
+  unitRate
 }: IofCalculatorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [cardIofRate, setCardIofRate] = useState<number>(3.38); // 3.38% (cronograma oficial de redução)
@@ -34,6 +40,8 @@ export default function IofCalculator({
   const [cashSpread, setCashSpread] = useState<number>(2.5); // 2.5% spread médio casas de câmbio
   const [globalSpread, setGlobalSpread] = useState<number>(1.5); // 1.5% contas globais
   const [showSettings, setShowSettings] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportedSuccess, setExportedSuccess] = useState(false);
 
   // Determinar o valor em moeda estrangeira
   const isForeignOrigin = fromCurrency !== 'BRL';
@@ -50,68 +58,41 @@ export default function IofCalculator({
   // Cotação comercial de referência
   const commercialRate = baseRateToBRL > 0 ? baseRateToBRL : 5.6850;
 
-  // Cálculos dos 3 métodos:
+  // Cálculos dos 3 métodos via utilitário compartilhado
   const calculations = useMemo(() => {
-    // 1. Dinheiro em Espécie (Papel-Moeda)
-    // IOF fixo em 1,10%
-    const cashRate = commercialRate * (1 + cashSpread / 100);
-    const cashSubtotal = purchaseAmount * cashRate;
-    const cashIof = cashSubtotal * 0.011;
-    const cashTotal = cashSubtotal + cashIof;
-    const cashVet = purchaseAmount > 0 ? cashTotal / purchaseAmount : 0;
-
-    // 2. Cartão de Crédito Internacional (Bancos Tradicionais)
-    // IOF do cartão
-    const cardRate = commercialRate * (1 + cardSpread / 100);
-    const cardSubtotal = purchaseAmount * cardRate;
-    const cardIof = cardSubtotal * (cardIofRate / 100);
-    const cardTotal = cardSubtotal + cardIof;
-    const cardVet = purchaseAmount > 0 ? cardTotal / purchaseAmount : 0;
-
-    // 3. Cartão de Débito Conta Global (Wise / Nomad / C6 / Inter)
-    // IOF de 1,10% (transferência para conta própria no exterior)
-    const globalRate = commercialRate * (1 + globalSpread / 100);
-    const globalSubtotal = purchaseAmount * globalRate;
-    const globalIof = globalSubtotal * 0.011;
-    const globalTotal = globalSubtotal + globalIof;
-    const globalVet = purchaseAmount > 0 ? globalTotal / purchaseAmount : 0;
-
-    // Economia comparativa em relação ao Cartão de Crédito
-    const diffCashVsCard = cardTotal - cashTotal;
-    const diffGlobalVsCard = cardTotal - globalTotal;
-
-    return {
-      cash: {
-        rate: cashRate,
-        subtotal: cashSubtotal,
-        iofAmount: cashIof,
-        total: cashTotal,
-        vet: cashVet,
-        iofPercent: 1.10,
-        spreadPercent: cashSpread
-      },
-      card: {
-        rate: cardRate,
-        subtotal: cardSubtotal,
-        iofAmount: cardIof,
-        total: cardTotal,
-        vet: cardVet,
-        iofPercent: cardIofRate,
-        spreadPercent: cardSpread
-      },
-      global: {
-        rate: globalRate,
-        subtotal: globalSubtotal,
-        iofAmount: globalIof,
-        total: globalTotal,
-        vet: globalVet,
-        iofPercent: 1.10,
-        spreadPercent: globalSpread
-      },
-      diffCashVsCard,
-      diffGlobalVsCard
-    };
+    return calculateIof({
+      purchaseAmount,
+      commercialRate,
+      cardIofRate,
+      cardSpread,
+      cashSpread,
+      globalSpread
+    });
   }, [purchaseAmount, commercialRate, cardIofRate, cardSpread, cashSpread, globalSpread]);
+
+  const handleExportPdf = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setIsExporting(true);
+    try {
+      exportConverterPdf({
+        amount,
+        fromCurrency,
+        toCurrency,
+        result: convertedResult || (amount * (baseRateToBRL || 1)),
+        unitRate: unitRate || (baseRateToBRL || 1),
+        purchaseAmount,
+        effectiveCurrency,
+        commercialRate,
+        calculations
+      });
+      setExportedSuccess(true);
+      setTimeout(() => setExportedSuccess(false), 3000);
+    } catch (err) {
+      console.error('Erro ao gerar PDF', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const currencySymbols: Record<string, string> = {
     USD: '$',
@@ -148,13 +129,26 @@ export default function IofCalculator({
           </div>
         </div>
 
-        <button
-          type="button"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary font-bold text-xs transition-colors self-end sm:self-auto shrink-0"
-        >
-          <span>{isOpen ? 'Ocultar Comparativo' : 'Ver Comparativo de IOF'}</span>
-          {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
+        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={isExporting}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-black font-bold text-xs hover:bg-primary/90 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+            title="Exportar resumo completo da cotação e simulação de IOF em PDF"
+          >
+            {exportedSuccess ? <Check size={14} className="text-black" /> : <FileDown size={14} />}
+            <span>{isExporting ? 'Gerando...' : exportedSuccess ? 'PDF Baixado!' : 'Exportar Resumo'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary font-bold text-xs transition-colors"
+          >
+            <span>{isOpen ? 'Ocultar' : 'Comparar IOF'}</span>
+            {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+        </div>
       </div>
 
       {/* Conteúdo Expansível do Módulo de IOF */}
@@ -186,14 +180,26 @@ export default function IofCalculator({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowSettings(!showSettings)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-text/5 hover:bg-text/10 border border-border text-text-muted hover:text-text text-xs font-semibold transition-colors shrink-0"
-                >
-                  <Sliders size={13} />
-                  <span>Ajustar Alíquotas & Spread</span>
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleExportPdf}
+                    disabled={isExporting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-black font-bold text-xs hover:bg-primary/90 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    {exportedSuccess ? <Check size={13} /> : <FileDown size={13} />}
+                    <span>{isExporting ? 'Gerando...' : 'Exportar PDF'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowSettings(!showSettings)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-text/5 hover:bg-text/10 border border-border text-text-muted hover:text-text text-xs font-semibold transition-colors"
+                  >
+                    <Sliders size={13} />
+                    <span>Ajustar Taxas</span>
+                  </button>
+                </div>
               </div>
 
               {/* Ajustes Avançados Opcionais (Sliders e Alíquotas) */}

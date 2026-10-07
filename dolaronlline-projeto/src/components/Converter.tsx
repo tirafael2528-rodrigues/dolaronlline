@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Repeat, ArrowRightLeft } from 'lucide-react';
+import { Repeat, ArrowRightLeft, FileDown, Check } from 'lucide-react';
 import { CoinData } from '../types';
 import IofCalculator from './IofCalculator';
+import { calculateIof } from '../utils/iof';
+import { exportConverterPdf } from '../utils/exportPdf';
 
 interface ConverterProps {
   quotes: Record<string, CoinData>;
@@ -39,6 +41,8 @@ export default function Converter({ quotes }: ConverterProps) {
   const [fromCurrency, setFromCurrency] = useState('USD');
   const [toCurrency, setToCurrency] = useState('BRL');
   const [result, setResult] = useState<number>(0);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportedSuccess, setExportedSuccess] = useState(false);
 
   useEffect(() => {
     const rateFrom = getRateToBRL(fromCurrency, quotes);
@@ -53,6 +57,39 @@ export default function Converter({ quotes }: ConverterProps) {
     const temp = fromCurrency;
     setFromCurrency(toCurrency);
     setToCurrency(temp);
+  };
+
+  const handleExportSummary = () => {
+    setIsExporting(true);
+    try {
+      const isForeignOrigin = fromCurrency !== 'BRL';
+      const effectiveCurrency = isForeignOrigin ? fromCurrency : (toCurrency === 'BRL' ? 'USD' : toCurrency);
+      const foreignRate = fromCurrency !== 'BRL' ? rateFrom : rateTo;
+      const purchaseAmount = amount <= 0 ? 500 : (isForeignOrigin ? amount : (foreignRate > 0 ? Math.round(amount / foreignRate) : 500));
+      const commercialRate = foreignRate > 0 ? foreignRate : 5.6850;
+      const iofCalcs = calculateIof({
+        purchaseAmount,
+        commercialRate,
+      });
+
+      exportConverterPdf({
+        amount,
+        fromCurrency,
+        toCurrency,
+        result,
+        unitRate,
+        purchaseAmount,
+        effectiveCurrency,
+        commercialRate,
+        calculations: iofCalcs,
+      });
+      setExportedSuccess(true);
+      setTimeout(() => setExportedSuccess(false), 3000);
+    } catch (err) {
+      console.error('Erro ao exportar PDF', err);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleAmountChange = (val: string) => {
@@ -112,25 +149,39 @@ export default function Converter({ quotes }: ConverterProps) {
             </p>
           </div>
 
-          {/* Quick presets */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider mr-1">Rápido:</span>
-            {presets.map(p => (
-              <button
-                key={p}
-                onClick={() => {
-                  setAmount(p);
-                  setAmountStr(p.toString());
-                }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                  amount === p 
-                    ? 'bg-primary text-black border-primary font-bold shadow-xs' 
-                    : 'bg-text/5 text-text-muted border-border hover:text-text hover:border-text/20'
-                }`}
-              >
-                {p.toLocaleString('pt-BR')}
-              </button>
-            ))}
+          {/* Action buttons & Quick presets */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={handleExportSummary}
+              disabled={isExporting}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary text-black font-bold text-xs hover:bg-primary/90 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+              title="Exportar resumo completo da cotação e cálculo de IOF em PDF"
+            >
+              {exportedSuccess ? <Check size={14} className="text-black" /> : <FileDown size={14} />}
+              <span>{isExporting ? 'Gerando...' : exportedSuccess ? 'PDF Baixado!' : 'Exportar Resumo'}</span>
+            </button>
+
+            {/* Quick presets */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider mr-1">Rápido:</span>
+              {presets.map(p => (
+                <button
+                  key={p}
+                  onClick={() => {
+                    setAmount(p);
+                    setAmountStr(p.toString());
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                    amount === p 
+                      ? 'bg-primary text-black border-primary font-bold shadow-xs' 
+                      : 'bg-text/5 text-text-muted border-border hover:text-text hover:border-text/20'
+                  }`}
+                >
+                  {p.toLocaleString('pt-BR')}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -231,6 +282,8 @@ export default function Converter({ quotes }: ConverterProps) {
           fromCurrency={fromCurrency}
           toCurrency={toCurrency}
           baseRateToBRL={fromCurrency !== 'BRL' ? rateFrom : rateTo}
+          convertedResult={result}
+          unitRate={unitRate}
         />
       </div>
     </section>
