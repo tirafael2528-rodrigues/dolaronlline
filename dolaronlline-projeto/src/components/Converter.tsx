@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Repeat, ArrowRightLeft } from 'lucide-react';
 import { CoinData } from '../types';
+import IofCalculator from './IofCalculator';
 
 interface ConverterProps {
   quotes: Record<string, CoinData>;
@@ -223,6 +224,14 @@ export default function Converter({ quotes }: ConverterProps) {
             </div>
           </div>
         </div>
+
+        {/* Módulo de Cálculo de IOF para Compras Internacionais */}
+        <IofCalculator
+          amount={amount}
+          fromCurrency={fromCurrency}
+          toCurrency={toCurrency}
+          baseRateToBRL={fromCurrency !== 'BRL' ? rateFrom : rateTo}
+        />
       </div>
     </section>
   );
